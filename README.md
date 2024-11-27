@@ -39,7 +39,7 @@ MOSU is a web-based platform that simplifies group food ordering by allowing mul
 1. Clone the repository:
 ```bash
 git clone [your-repository-url]
-cd mvpbo
+cd mosu
 ```
 
 2. Create a virtual environment and activate it:
