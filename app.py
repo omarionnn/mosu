@@ -649,7 +649,34 @@ def update_quantity():
             'message': 'Failed to update quantity'
         })
 
-if __name__ == '__main__':
+def init_db():
     with app.app_context():
+        # Create all tables
         db.create_all()
+        
+        # Check if we already have menu items
+        if MenuItem.query.count() == 0:
+            # Add sample menu items
+            sample_items = [
+                MenuItem(name='Pizza Margherita', description='Classic tomato and mozzarella', price=12.99, category='Pizza'),
+                MenuItem(name='Pepperoni Pizza', description='Spicy pepperoni with cheese', price=14.99, category='Pizza'),
+                MenuItem(name='Caesar Salad', description='Fresh romaine lettuce with caesar dressing', price=8.99, category='Salad'),
+                MenuItem(name='Chocolate Cake', description='Rich chocolate layer cake', price=6.99, category='Dessert'),
+                MenuItem(name='Coca Cola', description='Classic cola drink', price=2.99, category='Beverages'),
+            ]
+            
+            for item in sample_items:
+                db.session.add(item)
+            
+            try:
+                db.session.commit()
+                print("Sample menu items added successfully!")
+            except Exception as e:
+                print(f"Error adding sample items: {e}")
+                db.session.rollback()
+
+if __name__ == '__main__':
+    init_db()
     app.run(port=9091, debug=True)
+else:
+    init_db()  # This ensures the database is initialized when running on Render
