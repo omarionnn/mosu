@@ -1,6 +1,6 @@
-# MOSU - Collaborative Food Ordering Platform
+# BigOrders - Collaborative Food Ordering Platform
 
-MOSU is a web-based platform that simplifies group food ordering by allowing multiple users to collaboratively create and manage food orders in real-time.
+BigOrders is a web-based platform that simplifies group food ordering by allowing multiple users to collaboratively create and manage food orders in real-time.
 
 ## Features
 
