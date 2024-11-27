@@ -68,6 +68,18 @@ python3 app.py
 
 The application will be available at `http://localhost:9091`
 
+## 🌐 Live Demo
+
+**Try it now**: [https://bigorders.onrender.com](https://bigorders.onrender.com)
+
+To test the application, you can:
+1. Create your own account, or
+2. Use these demo credentials:
+   - Email: `demo@example.com`
+   - Password: `demo123`
+
+Note: The free-tier hosting may take 30-60 seconds to wake up on first access.
+
 ## Usage
 
 1. **Create an Order**:
