@@ -1,119 +1,104 @@
-# Big Orders - Collaborative Food Ordering Platform
+# MOSU - Collaborative Food Ordering Platform
 
-A web application that streamlines group food ordering with advanced cart management and receipt generation features.
-
-🌐 **Live Demo**: [https://bigorders.onrender.com](https://bigorders.onrender.com)
+MOSU is a web-based platform that simplifies group food ordering by allowing multiple users to collaboratively create and manage food orders in real-time.
 
 ## Features
 
-- 👥 **User Management**
-  - Sign up with email
-  - Secure login/logout
+- **User Authentication**
+  - Secure signup and login
   - Session management
+  - User-specific data isolation
 
-- 🛒 **Order Management**
-  - Create new orders with custom names
-  - Join existing orders using PIN
-  - Leave orders
-  - Multiple users can collaborate on one order
+- **Order Management**
+  - Create orders with unique 4-digit PINs
+  - Join existing orders using PINs
+  - Real-time cart management
+  - Leave order functionality
 
-- 🍽️ **Cart Features**
-  - Add items to cart
-  - Update quantities
-  - Remove items
-  - User-specific cart tracking
+- **Multi-User Support**
+  - Multiple users can join the same order
+  - Individual cart tracking per user
+  - Collaborative order building
 
-- 📝 **Receipt Generation**
-  - Detailed receipt per order
+- **Comprehensive Receipt Generation**
   - Items grouped by user
   - Individual subtotals
-  - Order grand total
+  - Group total calculation
+  - Order details and timestamp
 
-## Technology Stack
+## Tech Stack
 
-- Backend: Flask (Python)
-- Frontend: Vanilla JavaScript
-- Database: SQLite with SQLAlchemy ORM
-- Authentication: Flask-Login
+- **Backend**: Flask (Python)
+- **Frontend**: Vanilla JavaScript
+- **Database**: SQLite with SQLAlchemy ORM
+- **Authentication**: Flask-Login
+- **Styling**: Tailwind CSS
 
-## Local Development Setup
+## Installation
 
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/omarionnn/mosu.git
-   cd mosu
-   ```
+1. Clone the repository:
+```bash
+git clone [your-repository-url]
+cd mosu
+```
 
-2. **Set Up Python Environment**
-   ```bash
-   # Create virtual environment
-   python3 -m venv venv
-   
-   # Activate virtual environment
-   # On macOS/Linux:
-   source venv/bin/activate
-   # On Windows:
-   .\venv\Scripts\activate
-   ```
+2. Create a virtual environment and activate it:
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows, use: venv\Scripts\activate
+```
 
-3. **Install Dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-4. **Initialize the Database**
-   ```bash
-   # The database will be automatically initialized when you run the app
-   # It will create tables and add sample menu items
-   ```
+4. Initialize the database:
+```bash
+python3
+>>> from app import db
+>>> db.create_all()
+>>> exit()
+```
 
-5. **Run the Application**
-   ```bash
-   python3 app.py
-   ```
+5. Run the application:
+```bash
+python3 app.py
+```
 
-6. **Access the Application**
-   - Open your browser and go to `http://localhost:9091`
-   - The sample menu items will be automatically added on first run
+The application will be available at `http://localhost:9091`
 
-## Production Deployment
+## Usage
 
-The application is deployed on Render.com. To deploy your own instance:
+1. **Create an Order**:
+   - Sign up or log in
+   - Click "Create Order"
+   - Share the PIN with your group
 
-1. Fork this repository
-2. Create a new Web Service on Render
-3. Connect your GitHub repository
-4. Configure the following:
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `gunicorn app:app --bind 0.0.0.0:$PORT`
-   - Python Version: 3.11.0
+2. **Join an Order**:
+   - Log in to your account
+   - Enter the order PIN
+   - Start adding items to your cart
 
-## Environment Variables
+3. **Generate Receipt**:
+   - Click "Generate Receipt" to see all items
+   - View individual and group totals
 
-For production deployment, set these environment variables:
-- `FLASK_ENV`: Set to `production`
-- `FLASK_APP`: Set to `app.py`
-- `SECRET_KEY`: Set to a secure random string
+## Security Features
 
-## Database Schema
-
-- **User**: Stores user information and authentication details
-- **Order**: Manages order information including PIN and status
-- **MenuItem**: Stores available menu items
-- **OrderItem**: Tracks items added to orders with quantities
+- Password hashing
+- Session-based authentication
+- Input validation
+- Secure error handling
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+Feel free to submit issues, fork the repository, and create pull requests for any improvements.
 
 ## License
 
-MIT License - feel free to use this project as you wish.
+[MIT License](LICENSE)
 
-## Support
+## Author
 
-For issues or feature requests, please create an issue in the GitHub repository.
+Omar Inyarko
