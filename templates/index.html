@@ -84,24 +84,23 @@
     </div>
 
     <!-- Active Order Screen -->
-    <div id="active-order" class="hidden min-h-screen">
-        <header class="bg-white shadow">
-            <div class="container mx-auto px-4 py-4">
-                <div class="flex justify-between items-center">
-                    <div class="flex items-center space-x-4">
-                        <div class="text-lg font-semibold" id="order-pin"></div>
-                        <h1 class="text-2xl font-bold text-center" id="order-name"></h1>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <span id="user-name-active" class="text-gray-600"></span>
-                        <button id="generate-receipt-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Generate Receipt</button>
-                        <button id="leave-order-btn" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700">Leave Order</button>
-                        <button id="logout-btn-active" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Logout</button>
-                    </div>
-                </div>
+    <div id="active-order" class="hidden container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-8">
+            <h2 class="text-2xl font-bold">Big Orders</h2>
+            <div class="flex items-center space-x-4">
+                <span id="user-name-active" class="text-gray-600"></span>
+                <button onclick="generateReceipt()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Generate Receipt</button>
+                <button onclick="leaveOrder()" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Leave Order</button>
+                <button id="logout-btn-active" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Logout</button>
             </div>
-        </header>
-
+        </div>
+        
+        <!-- Order Info -->
+        <div class="text-center mb-8">
+            <h3 id="order-name-display" class="text-xl font-semibold mb-2"></h3>
+            <p id="order-pin-display" class="text-gray-600"></p>
+        </div>
+        
         <main class="container mx-auto px-4 py-8">
             <div class="grid grid-cols-3 gap-8">
                 <!-- Menu Categories -->
@@ -126,20 +125,16 @@
 
         <!-- Receipt Modal -->
         <div id="receipt-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div class="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div class="p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold">Order Receipt</h2>
-                        <button class="modal-close text-gray-500 hover:text-gray-700">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div id="receipt-content">
-                        <!-- Receipt content will be dynamically added here -->
-                    </div>
+            <div class="bg-white p-8 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">Receipt</h2>
+                    <button onclick="document.getElementById('receipt-modal').style.display='none'" class="text-gray-500 hover:text-gray-700">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                 </div>
+                <div id="receipt-content" class="mt-4"></div>
             </div>
         </div>
     </div>

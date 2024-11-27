@@ -95,7 +95,7 @@ async function handleLogin(event) {
     }
 }
 
-async function handleLogout() {
+async function logout() {
     try {
         const response = await fetch('/logout', {
             method: 'POST',
@@ -103,34 +103,21 @@ async function handleLogout() {
                 'Content-Type': 'application/json'
             }
         });
-        
-        const data = await response.json();
-        
-        if (response.ok && data.success) {
-            // Clear any stored data
-            updateCartDisplay([]);
-            
+
+        if (response.ok) {
+            // Clear session
+            currentUser = null;
+            cart.clear();
+            // Show success message
+            showMessage('Logged out successfully');
             // Switch to auth screen
             showScreen('auth-screen');
-            
-            // Reset forms
-            if (document.getElementById('signup-form')) {
-                document.getElementById('signup-form').reset();
-            }
-            if (document.getElementById('login-form')) {
-                document.getElementById('login-form').reset();
-            }
-            
-            // Show success message
-            if (data.message) {
-                alert(data.message);
-            }
         } else {
-            alert(data.message || 'Failed to logout');
+            showError('Failed to logout');
         }
     } catch (error) {
-        console.error('Error during logout:', error);
-        alert('Failed to logout. Please try again.');
+        console.error('Error:', error);
+        showError('Failed to logout');
     }
 }
 
@@ -150,7 +137,7 @@ async function createOrder(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
     const data = {
-        name: formData.get('order-name')
+        order_name: formData.get('order-name')
     };
 
     try {
@@ -165,18 +152,21 @@ async function createOrder(event) {
         const responseData = await response.json();
 
         if (response.ok && responseData.success) {
+            // Update order display
+            document.getElementById('order-name-display').textContent = `Order: ${responseData.order.name}`;
+            document.getElementById('order-pin-display').textContent = `PIN: ${responseData.order.pin}`;
+            
             currentOrder = responseData.order;
             showScreen('active-order');
-            updateOrderHeader();
             loadMenuItems();
-            alert(`Order created! Share this PIN with others: ${responseData.pin}`);
+            showMessage(`Order created! Share this PIN with others: ${responseData.order.pin}`);
             event.target.reset();
         } else {
-            alert(responseData.message || 'Failed to create order');
+            showError(responseData.message || 'Failed to create order');
         }
     } catch (error) {
         console.error('Error creating order:', error);
-        alert('An error occurred while creating the order');
+        showError('An error occurred while creating the order');
     }
 }
 
@@ -184,42 +174,34 @@ async function joinOrder(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
     const pin = formData.get('order-pin');
-    
-    console.log('Attempting to join order with PIN:', pin);
-
-    if (!pin) {
-        alert('Please enter a PIN');
-        return;
-    }
 
     try {
-        console.log('Sending join request...');
         const response = await fetch('/join_order', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ pin: pin })
+            body: JSON.stringify({ pin })
         });
 
-        console.log('Response status:', response.status);
-        const responseData = await response.json();
-        console.log('Response data:', responseData);
+        const data = await response.json();
 
-        if (response.ok && responseData.success) {
-            console.log('Successfully joined order:', responseData.order);
-            currentOrder = responseData.order;
+        if (response.ok && data.success) {
+            // Update order display
+            document.getElementById('order-name-display').textContent = `Order: ${data.order.name}`;
+            document.getElementById('order-pin-display').textContent = `PIN: ${data.order.pin}`;
+            
+            currentOrder = data.order;
             showScreen('active-order');
-            updateOrderHeader();
             loadMenuItems();
+            showMessage('Successfully joined order!');
             event.target.reset();
         } else {
-            console.error('Failed to join order:', responseData.message);
-            alert(responseData.message || 'Failed to join order');
+            showError(data.message || 'Failed to join order');
         }
     } catch (error) {
-        console.error('Error joining order:', error);
-        alert('An error occurred while joining the order');
+        console.error('Error:', error);
+        showError('Failed to join order');
     }
 }
 
@@ -234,118 +216,198 @@ function updateOrderHeader() {
 async function loadMenuItems() {
     try {
         const response = await fetch('/menu_items');
-        if (response.ok) {
-            const data = await response.json();
-            const menuContainer = document.getElementById('menu-categories');
-            menuContainer.innerHTML = '';
-            
-            Object.entries(data.categories).forEach(([category, items]) => {
-                const categoryElement = document.createElement('div');
-                categoryElement.className = 'bg-white rounded-lg shadow-lg p-6';
-                categoryElement.innerHTML = `
-                    <h3 class="text-2xl font-bold mb-6 text-gray-800">${category}</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        ${items.map(item => `
-                            <div class="bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
-                                <div class="flex justify-between items-start">
-                                    <div class="flex-1">
-                                        <h4 class="text-lg font-semibold text-gray-800">${item.name}</h4>
-                                        ${item.description ? 
-                                            `<p class="text-gray-600 text-sm mt-1 mb-3">${item.description}</p>` : 
-                                            '<div class="mb-3"></div>'}
-                                        <span class="text-lg font-bold text-indigo-600">$${item.price.toFixed(2)}</span>
-                                    </div>
-                                    <button 
-                                        class="add-to-cart-btn ml-4 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 
-                                               transition-colors duration-200 flex items-center"
-                                        data-menu-item-id="${item.id}">
-                                        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                                        </svg>
-                                        Add
-                                    </button>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-                menuContainer.appendChild(categoryElement);
-            });
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to load menu items');
         }
+
+        const menuContainer = document.getElementById('menu-categories');
+        menuContainer.innerHTML = '';
+
+        // Group items by category
+        const categories = {};
+        data.menu_items.forEach(item => {
+            if (!categories[item.category]) {
+                categories[item.category] = [];
+            }
+            categories[item.category].push(item);
+        });
+
+        // Create category sections
+        Object.entries(categories).forEach(([category, items]) => {
+            const categorySection = document.createElement('div');
+            categorySection.className = 'category-section mb-8';
+            categorySection.innerHTML = `
+                <h2 class="text-2xl font-bold mb-4">${category}</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    ${items.map(item => `
+                        <div class="menu-item bg-white p-4 rounded-lg shadow">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h3 class="text-lg font-semibold">${item.name}</h3>
+                                    <p class="text-gray-600">${item.description || ''}</p>
+                                    <p class="text-lg font-bold text-indigo-600 mt-2">$${item.price.toFixed(2)}</p>
+                                </div>
+                                <button 
+                                    class="add-to-cart-btn bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+                                    data-item-name="${item.name}"
+                                    data-item-price="${item.price}">
+                                    Add to Cart
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            menuContainer.appendChild(categorySection);
+        });
     } catch (error) {
         console.error('Error loading menu items:', error);
+        showError('Failed to load menu items');
     }
 }
 
 // Cart Management
-async function addToCart(menuItemId) {
-    if (!menuItemId) {
-        console.error('Menu item ID is missing');
+async function addToCart(itemName, price) {
+    if (!currentUser) {
+        showError('Please log in first');
         return;
     }
-    
+
     try {
         const response = await fetch('/add_to_cart', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ menu_item_id: parseInt(menuItemId) })
+            body: JSON.stringify({
+                item_name: itemName,
+                price: parseFloat(price)
+            })
         });
-        
+
         const data = await response.json();
         
         if (response.ok && data.success) {
-            // Update cart display with the new items
             updateCartDisplay(data.cart_items);
-            
-            // Show success message
-            if (data.message) {
-                console.log(data.message);
-            }
+            showMessage('Item added to cart');
         } else {
-            alert(data.message || 'Failed to add item to cart');
+            showError(data.message || 'Failed to add item to cart');
         }
     } catch (error) {
-        console.error('Error adding to cart:', error);
-        alert('Failed to add item to cart. Please try again.');
+        console.error('Error:', error);
+        showError('Failed to add item to cart');
     }
 }
 
 function updateCartDisplay(cartItems) {
-    const cartList = document.getElementById('cart-items');
-    const cartTotal = document.getElementById('cart-total');
-    let total = 0;
+    const cartDiv = document.getElementById('cart-items');
+    cartDiv.innerHTML = '';
     
-    // Clear current cart display
-    cartList.innerHTML = '';
+    if (cartItems && cartItems.length > 0) {
+        let total = 0;
+        
+        cartItems.forEach(item => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'cart-item flex justify-between items-center p-2 border-b';
+            const itemTotal = item.price * item.quantity;
+            total += itemTotal;
+            
+            itemDiv.innerHTML = `
+                <div class="item-info flex-1">
+                    <span class="font-semibold">${item.name}</span>
+                    <div class="quantity-controls flex items-center mt-1">
+                        <button onclick="updateQuantity('${item.name}', ${item.quantity - 1})" 
+                                class="bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
+                                ${item.quantity <= 1 ? 'disabled' : ''}>-</button>
+                        <span class="mx-2">${item.quantity}</span>
+                        <button onclick="updateQuantity('${item.name}', ${item.quantity + 1})" 
+                                class="bg-gray-200 px-2 py-1 rounded hover:bg-gray-300">+</button>
+                    </div>
+                </div>
+                <div class="item-actions flex items-center ml-4">
+                    <span class="font-bold mr-4">$${itemTotal.toFixed(2)}</span>
+                    <button onclick="removeFromCart('${item.name}')" class="text-red-600 hover:text-red-800">
+                        Remove
+                    </button>
+                </div>
+            `;
+            cartDiv.appendChild(itemDiv);
+        });
+        
+        const totalDiv = document.getElementById('cart-total');
+        if (totalDiv) {
+            totalDiv.textContent = `Total: $${total.toFixed(2)}`;
+        }
+    } else {
+        cartDiv.innerHTML = '<p class="text-gray-500 text-center py-4">Your cart is empty</p>';
+        const totalDiv = document.getElementById('cart-total');
+        if (totalDiv) {
+            totalDiv.textContent = 'Total: $0.00';
+        }
+    }
+}
+
+async function updateQuantity(itemName, newQuantity) {
+    if (newQuantity < 1) return;
     
-    // Add each item to the cart display
-    cartItems.forEach(item => {
-        const itemElement = document.createElement('div');
-        itemElement.className = 'flex justify-between items-center p-2 border-b';
-        itemElement.innerHTML = `
-            <div>
-                <h4 class="font-semibold">${item.name}</h4>
-                <p class="text-gray-600">$${item.price.toFixed(2)} x ${item.quantity}</p>
-            </div>
-            <div class="text-right">
-                <p class="font-semibold">$${item.total.toFixed(2)}</p>
-            </div>
-        `;
-        cartList.appendChild(itemElement);
-        total += item.total;
-    });
-    
-    // Update total
-    cartTotal.textContent = `Total: $${total.toFixed(2)}`;
+    try {
+        const response = await fetch('/update_quantity', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                item_name: itemName,
+                quantity: newQuantity
+            })
+        });
+
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            updateCartDisplay(data.cart_items);
+        } else {
+            showError(data.message || 'Failed to update quantity');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showError('Failed to update quantity');
+    }
+}
+
+async function removeFromCart(itemName) {
+    try {
+        const response = await fetch('/remove_from_cart', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                item_name: itemName
+            })
+        });
+
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            updateCartDisplay(data.cart_items);
+            showMessage('Item removed from cart');
+        } else {
+            showError(data.message || 'Failed to remove item');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showError('Failed to remove item from cart');
+    }
 }
 
 async function leaveOrder() {
     if (!confirm('Are you sure you want to leave this order?')) {
         return;
     }
-    
+
     try {
         const response = await fetch('/leave_order', {
             method: 'POST',
@@ -353,26 +415,30 @@ async function leaveOrder() {
                 'Content-Type': 'application/json'
             }
         });
-        
+
         const data = await response.json();
-        
+
         if (response.ok && data.success) {
-            // Clear cart display
+            // Clear cart and local state
+            cart.clear();
             updateCartDisplay([]);
+            showMessage('Successfully left the order');
             
-            // Switch back to order options screen
+            // Update UI
+            document.getElementById('order-name-display').textContent = '';
+            document.getElementById('order-pin-display').textContent = '';
+            
+            // Switch to order options screen
             showScreen('order-options');
             
-            // Show success message
-            if (data.message) {
-                alert(data.message);
-            }
+            // Clear any active order info
+            document.getElementById('active-order-info').style.display = 'none';
         } else {
-            alert(data.message || 'Failed to leave order');
+            showError(data.message || 'Failed to leave order');
         }
     } catch (error) {
-        console.error('Error leaving order:', error);
-        alert('Failed to leave order. Please try again.');
+        console.error('Error:', error);
+        showError('Failed to leave order');
     }
 }
 
@@ -381,63 +447,90 @@ async function generateReceipt() {
         const response = await fetch('/generate_receipt');
         const data = await response.json();
 
-        if (response.ok && data.success) {
-            const receipt = data.receipt;
+        if (data.success) {
             const modal = document.getElementById('receipt-modal');
-            const modalContent = document.getElementById('receipt-content');
-
-            // Create receipt HTML
+            const content = document.getElementById('receipt-content');
+            
             let receiptHtml = `
-                <div class="text-lg font-bold mb-4">Order Receipt</div>
-                <div class="mb-2">Order: ${receipt.order_name}</div>
-                <div class="mb-4">PIN: ${receipt.order_pin}</div>
-                <div class="mb-4">Time: ${receipt.timestamp}</div>
-            `;
-
-            // Add items for each user
-            for (const [userName, userOrder] of Object.entries(receipt.user_orders)) {
-                receiptHtml += `
-                    <div class="mt-4 mb-2 font-semibold text-indigo-600">${userName}'s Order:</div>
-                    <div class="border-t border-gray-200 mb-2"></div>
-                `;
-
-                // Add items
-                userOrder.items.forEach(item => {
-                    receiptHtml += `
-                        <div class="flex justify-between mb-1">
-                            <span>${item.quantity}x ${item.name}</span>
-                            <span>$${(item.total).toFixed(2)}</span>
-                        </div>
-                    `;
-                });
-
-                // Add user subtotal
-                receiptHtml += `
-                    <div class="flex justify-between mt-2 font-semibold">
-                        <span>Subtotal</span>
-                        <span>$${userOrder.subtotal.toFixed(2)}</span>
-                    </div>
-                    <div class="border-b border-gray-200 mb-4"></div>
-                `;
-            }
-
-            // Add total amount
-            receiptHtml += `
-                <div class="flex justify-between mt-4 text-lg font-bold">
-                    <span>Total Amount</span>
-                    <span>$${receipt.total_amount.toFixed(2)}</span>
+                <div class="text-center mb-6">
+                    <h2 class="text-2xl font-bold mb-2">${data.order_name}</h2>
+                    <p class="text-gray-600">PIN: ${data.order_pin}</p>
                 </div>
             `;
 
-            modalContent.innerHTML = receiptHtml;
-            modal.classList.remove('hidden');
+            // Add each user's order
+            Object.values(data.user_orders).forEach(userOrder => {
+                receiptHtml += `
+                    <div class="mb-6 border-b pb-4">
+                        <h3 class="text-xl font-semibold mb-3">${userOrder.name}'s Order</h3>
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-left">
+                                    <th class="pb-2">Item</th>
+                                    <th class="pb-2">Qty</th>
+                                    <th class="pb-2">Price</th>
+                                    <th class="pb-2 text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                userOrder.items.forEach(item => {
+                    receiptHtml += `
+                        <tr>
+                            <td class="py-1">${item.name}</td>
+                            <td class="py-1">${item.quantity}</td>
+                            <td class="py-1">$${item.price.toFixed(2)}</td>
+                            <td class="py-1 text-right">$${item.total.toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+
+                receiptHtml += `
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="pt-2 text-right font-semibold">Subtotal:</td>
+                                    <td class="pt-2 text-right font-semibold">$${userOrder.subtotal.toFixed(2)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                `;
+            });
+
+            // Add grand total
+            receiptHtml += `
+                <div class="text-right text-xl font-bold mt-4">
+                    Grand Total: $${data.grand_total.toFixed(2)}
+                </div>
+            `;
+
+            content.innerHTML = receiptHtml;
+            modal.style.display = 'block';
         } else {
-            alert(data.message || 'Failed to generate receipt');
+            showError(data.message || 'Failed to generate receipt');
         }
     } catch (error) {
-        console.error('Error generating receipt:', error);
-        alert('Failed to generate receipt. Please try again.');
+        console.error('Error:', error);
+        showError('Failed to generate receipt');
     }
+}
+
+function showMessage(message) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded shadow-lg z-50';
+    messageDiv.textContent = message;
+    document.body.appendChild(messageDiv);
+    setTimeout(() => messageDiv.remove(), 3000);
+}
+
+function showError(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded shadow-lg z-50';
+    errorDiv.textContent = message;
+    document.body.appendChild(errorDiv);
+    setTimeout(() => errorDiv.remove(), 3000);
 }
 
 // Check authentication status on page load
@@ -501,11 +594,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Menu item click handling
     document.addEventListener('click', (e) => {
-        if (e.target.closest('.add-to-cart-btn')) {
-            const button = e.target.closest('.add-to-cart-btn');
-            const menuItemId = button.dataset.menuItemId;
-            if (menuItemId) {
-                addToCart(menuItemId);
+        const addToCartBtn = e.target.closest('.add-to-cart-btn');
+        if (addToCartBtn) {
+            const itemName = addToCartBtn.dataset.itemName;
+            const itemPrice = addToCartBtn.dataset.itemPrice;
+            if (itemName && itemPrice) {
+                addToCart(itemName, parseFloat(itemPrice));
             }
         }
     });
@@ -514,19 +608,19 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('generate-receipt-btn')?.addEventListener('click', generateReceipt);
     
     // Logout buttons
-    document.getElementById('logout-btn-options')?.addEventListener('click', handleLogout);
-    document.getElementById('logout-btn-active')?.addEventListener('click', handleLogout);
+    const logoutBtnOptions = document.getElementById('logout-btn-options');
+    const logoutBtnActive = document.getElementById('logout-btn-active');
+    
+    if (logoutBtnOptions) {
+        logoutBtnOptions.addEventListener('click', logout);
+    }
+    if (logoutBtnActive) {
+        logoutBtnActive.addEventListener('click', logout);
+    }
     
     // Leave order button
-    document.getElementById('leave-order-btn')?.addEventListener('click', leaveOrder);
-    
-    // Modal close buttons
-    document.querySelectorAll('.modal-close').forEach(button => {
-        button.addEventListener('click', () => {
-            const modal = button.closest('.modal');
-            if (modal) {
-                modal.classList.add('hidden');
-            }
-        });
-    });
+    const leaveOrderBtn = document.getElementById('leave-order-btn');
+    if (leaveOrderBtn) {
+        leaveOrderBtn.addEventListener('click', leaveOrder);
+    }
 });

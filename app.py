@@ -182,89 +182,125 @@ def login():
 @login_required
 def logout():
     try:
-        # Get user's active orders
-        active_orders = current_user.orders.filter_by(status='active').all()
-        
-        # Remove user from all active orders
-        for order in active_orders:
-            order.users.remove(current_user)
-            # Delete user's order items
-            OrderItem.query.filter_by(
-                order_id=order.id,
-                user_id=current_user.id
-            ).delete()
-        
-        db.session.commit()
-        
-        # Logout the user
+        # Clear session
+        session.clear()
+        # Logout user
         logout_user()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Logged out successfully'
-        })
-        
+        return jsonify({'success': True, 'message': 'Logged out successfully'})
     except Exception as e:
         print(f"Error during logout: {str(e)}")
-        db.session.rollback()
-        return jsonify({
-            'success': False,
-            'message': 'Failed to logout'
-        }), 500
+        return jsonify({'success': False, 'message': 'Failed to logout'})
 
 @app.route('/create_order', methods=['POST'])
 @login_required
 def create_order():
     try:
         data = request.get_json()
-        order_name = data.get('name')
+        order_name = data.get('order_name')
+        
         if not order_name:
-            return jsonify({'success': False, 'message': 'Order name is required'}), 400
-
-        # Generate a unique 4-digit PIN
-        pin = generate_pin()
-
+            return jsonify({
+                'success': False,
+                'message': 'Order name is required'
+            }), 400
+            
         # Create new order
+        pin = generate_pin()
         new_order = Order(
             name=order_name,
             pin=pin,
-            created_by=current_user.id,
-            status='active'
+            created_by=current_user.id
         )
         
-        try:
-            # Add the order to the database
-            db.session.add(new_order)
-            db.session.commit()
-            
-            # Add the creator to the order's users
-            new_order.users.append(current_user)
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': 'Order created successfully',
-                'pin': pin,
-                'order': {
-                    'id': new_order.id,
-                    'name': new_order.name,
-                    'pin': new_order.pin
-                }
-            })
-            
-        except SQLAlchemyError as e:
-            db.session.rollback()
-            print(f"Database error: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': 'Database error occurred'
-            }), 500
-            
+        # Add creator to the order's users
+        new_order.users.append(current_user)
+        
+        db.session.add(new_order)
+        db.session.commit()
+        
+        # Set the current order in session
+        session['current_order_id'] = new_order.id
+        
+        return jsonify({
+            'success': True,
+            'message': 'Order created successfully',
+            'order': {
+                'name': new_order.name,
+                'pin': new_order.pin
+            }
+        })
+        
     except Exception as e:
+        db.session.rollback()
         print(f"Error creating order: {str(e)}")
         return jsonify({
             'success': False,
             'message': 'Failed to create order'
+        }), 500
+
+@app.route('/join_order', methods=['POST'])
+@login_required
+def join_order():
+    try:
+        data = request.get_json()
+        pin = data.get('pin')
+        
+        if not pin:
+            return jsonify({
+                'success': False,
+                'message': 'PIN is required'
+            }), 400
+            
+        # Find order by PIN
+        order = Order.query.filter_by(pin=pin).first()
+        if not order:
+            return jsonify({
+                'success': False,
+                'message': 'Order not found'
+            }), 404
+            
+        # Check if user is already in the order
+        if current_user in order.users:
+            # If user is already in the order, just set the session
+            session['current_order_id'] = order.id
+            return jsonify({
+                'success': True,
+                'message': 'Rejoined order successfully',
+                'order': {
+                    'name': order.name,
+                    'pin': order.pin
+                }
+            })
+            
+        # Add user to order
+        order.users.append(current_user)
+        
+        # Set the current order in session
+        session['current_order_id'] = order.id
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Joined order successfully',
+            'order': {
+                'name': order.name,
+                'pin': order.pin
+            }
+        })
+        
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        print(f"Database error joining order: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Database error occurred'
+        }), 500
+    except Exception as e:
+        print(f"Error joining order: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Failed to join order'
         }), 500
 
 @app.route('/check_auth', methods=['GET'])
@@ -294,101 +330,29 @@ def check_auth():
         })
     return jsonify({'authenticated': False}), 401
 
-@app.route('/join_order', methods=['POST'])
-@login_required
-def join_order():
-    print("Join order request received")
-    try:
-        data = request.get_json()
-        print("Request data:", data)
-        
-        pin = data.get('pin')
-        print("PIN:", pin)
-
-        if not pin:
-            print("No PIN provided")
-            return jsonify({
-                'success': False,
-                'message': 'PIN is required'
-            }), 400
-
-        # Find the order with the given PIN
-        order = Order.query.filter_by(pin=pin).first()
-        print("Found order:", order)
-        
-        if not order:
-            print("No order found with PIN:", pin)
-            return jsonify({
-                'success': False,
-                'message': 'Invalid PIN or order not found'
-            }), 404
-
-        # Check if user is already in the order
-        is_member = current_user in order.users
-        print("User is already member:", is_member)
-        
-        if is_member:
-            print("User already in order")
-            return jsonify({
-                'success': True,
-                'message': 'Already joined this order',
-                'order': {
-                    'id': order.id,
-                    'name': order.name,
-                    'pin': order.pin,
-                    'status': order.status
-                }
-            })
-
-        # Add user to order
-        print("Adding user to order")
-        order.users.append(current_user)
-        db.session.commit()
-        print("Successfully added user to order")
-        
-        return jsonify({
-            'success': True,
-            'message': 'Successfully joined order',
-            'order': {
-                'id': order.id,
-                'name': order.name,
-                'pin': order.pin,
-                'status': order.status
-            }
-        })
-
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        print(f"Database error joining order: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': 'Database error occurred'
-        }), 500
-    except Exception as e:
-        print(f"Error joining order: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': 'Failed to join order'
-        }), 500
-
 @app.route('/menu_items')
 @login_required
 def get_menu_items():
-    # Group items by category
-    items_by_category = {}
-    items = MenuItem.query.all()
-    
-    for item in items:
-        if item.category not in items_by_category:
-            items_by_category[item.category] = []
-        items_by_category[item.category].append({
-            'id': item.id,
-            'name': item.name,
-            'description': item.description,
-            'price': item.price
-        })
-    
-    return jsonify({'categories': items_by_category})
+    try:
+        items = MenuItem.query.all()
+        menu_items = []
+        
+        for item in items:
+            menu_items.append({
+                'id': item.id,
+                'name': item.name,
+                'description': item.description,
+                'price': item.price,
+                'category': item.category
+            })
+        
+        return jsonify({'menu_items': menu_items})
+    except Exception as e:
+        print(f"Error fetching menu items: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Failed to load menu items'
+        }), 500
 
 @app.route('/cart')
 @login_required
@@ -429,216 +393,191 @@ def get_cart():
 def add_to_cart():
     try:
         data = request.get_json()
-        menu_item_id = data.get('menu_item_id')
+        item_name = data.get('item_name')
+        price = float(data.get('price'))
         
-        if not menu_item_id:
-            return jsonify({'success': False, 'message': 'Menu item ID is required'}), 400
-            
-        # Verify menu item exists
-        menu_item = MenuItem.query.get(menu_item_id)
-        if not menu_item:
-            return jsonify({'success': False, 'message': 'Invalid menu item'}), 400
-            
-        # Get the user's current active order
-        active_orders = current_user.orders.filter_by(status='active').all()
-        if not active_orders:
-            return jsonify({'success': False, 'message': 'No active order found'}), 404
-            
-        current_order = active_orders[0]  # Use the first active order
-        
-        try:
-            # Check if the item already exists in the cart
-            existing_item = OrderItem.query.filter_by(
-                order_id=current_order.id,
-                menu_item_id=menu_item_id,
-                user_id=current_user.id
-            ).first()
-            
-            if existing_item:
-                existing_item.quantity += 1
-            else:
-                new_item = OrderItem(
-                    order_id=current_order.id,
-                    menu_item_id=menu_item_id,
-                    user_id=current_user.id,
-                    quantity=1
-                )
-                db.session.add(new_item)
-                
-            db.session.commit()
-            
-            # Get updated cart items
-            cart_items = []
-            order_items = OrderItem.query.filter_by(
-                order_id=current_order.id,
-                user_id=current_user.id
-            ).all()
-            
-            for item in order_items:
-                menu_item = MenuItem.query.get(item.menu_item_id)
-                cart_items.append({
-                    'id': item.id,
-                    'name': menu_item.name,
-                    'price': menu_item.price,
-                    'quantity': item.quantity,
-                    'total': menu_item.price * item.quantity
-                })
-            
-            return jsonify({
-                'success': True,
-                'message': 'Item added to cart',
-                'cart_items': cart_items
-            })
-            
-        except SQLAlchemyError as e:
-            db.session.rollback()
-            print(f"Database error: {str(e)}")
+        if not item_name or not price:
             return jsonify({
                 'success': False,
-                'message': 'Database error occurred'
-            }), 500
+                'message': 'Item name and price are required'
+            })
+        
+        # Get current order
+        order_id = session.get('current_order_id')
+        if not order_id:
+            return jsonify({
+                'success': False,
+                'message': 'No active order'
+            })
             
+        # Find or create menu item
+        menu_item = MenuItem.query.filter_by(name=item_name).first()
+        if not menu_item:
+            menu_item = MenuItem(name=item_name, price=price)
+            db.session.add(menu_item)
+            db.session.flush()
+        
+        # Check if item already in cart
+        order_item = OrderItem.query.filter_by(
+            order_id=order_id,
+            user_id=current_user.id,
+            menu_item_id=menu_item.id
+        ).first()
+        
+        if order_item:
+            # Increment quantity if already exists
+            order_item.quantity += 1
+        else:
+            # Create new order item
+            order_item = OrderItem(
+                order_id=order_id,
+                user_id=current_user.id,
+                menu_item_id=menu_item.id,
+                quantity=1
+            )
+            db.session.add(order_item)
+        
+        db.session.commit()
+        
+        # Get updated cart
+        cart = get_cart()
+        return jsonify({
+            'success': True,
+            'message': 'Item added to cart',
+            'cart_items': cart.json['items']
+        })
+        
     except Exception as e:
+        db.session.rollback()
         print(f"Error adding to cart: {str(e)}")
         return jsonify({
             'success': False,
             'message': 'Failed to add item to cart'
-        }), 500
+        })
 
-@app.route('/remove_from_cart/<int:item_id>', methods=['POST'])
+@app.route('/remove_from_cart', methods=['POST'])
 @login_required
-def remove_from_cart(item_id):
-    order_id = session.get('current_order_id')
+def remove_from_cart():
+    data = request.get_json()
+    item_name = data.get('item_name')
     
-    if not order_id:
-        return jsonify({'message': 'No active order'}), 400
+    if not item_name:
+        return jsonify({'success': False, 'message': 'Item name is required'})
     
     try:
+        # Get current order
+        order_id = session.get('current_order_id')
+        if not order_id:
+            return jsonify({'success': False, 'message': 'No active order'})
+        
+        # Find the order item
         order_item = OrderItem.query.filter_by(
             order_id=order_id,
-            menu_item_id=item_id,
             user_id=current_user.id
-        ).first()
+        ).join(MenuItem).filter(MenuItem.name == item_name).first()
         
-        if order_item:
-            if order_item.quantity > 1:
-                order_item.quantity -= 1
-            else:
-                db.session.delete(order_item)
-            
-            db.session.commit()
+        if not order_item:
+            return jsonify({'success': False, 'message': 'Item not found in cart'})
         
-        return get_cart()
+        # Remove the item
+        db.session.delete(order_item)
+        db.session.commit()
+        
+        # Get updated cart
+        cart = get_cart()
+        return jsonify({
+            'success': True,
+            'message': 'Item removed successfully',
+            'cart_items': cart.json['items']
+        })
+        
     except Exception as e:
         db.session.rollback()
-        return jsonify({'message': 'Error removing item from cart'}), 500
+        print(f"Error removing item from cart: {str(e)}")
+        return jsonify({'success': False, 'message': 'Error removing item from cart'})
 
 @app.route('/leave_order', methods=['POST'])
 @login_required
 def leave_order():
     try:
-        # Get the user's current active order
-        active_orders = current_user.orders.filter_by(status='active').all()
-        if not active_orders:
-            return jsonify({'success': False, 'message': 'No active order found'}), 404
+        order_id = session.get('current_order_id')
+        if not order_id:
+            return jsonify({'success': False, 'message': 'No active order'})
             
-        current_order = active_orders[0]  # Use the first active order
+        # Get the order
+        order = Order.query.get(order_id)
+        if not order:
+            return jsonify({'success': False, 'message': 'Order not found'})
+            
+        # Remove all cart items for this user in this order
+        OrderItem.query.filter_by(
+            order_id=order_id,
+            user_id=current_user.id
+        ).delete()
         
-        try:
-            # Remove user from order
-            current_order.users.remove(current_user)
+        # Remove user from order
+        if current_user in order.users:
+            order.users.remove(current_user)
             
-            # Delete user's order items
-            OrderItem.query.filter_by(
-                order_id=current_order.id,
-                user_id=current_user.id
-            ).delete()
-            
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': 'Successfully left the order'
-            })
-            
-        except SQLAlchemyError as e:
-            db.session.rollback()
-            print(f"Database error: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': 'Database error occurred'
-            }), 500
-            
+        # Clear session order ID
+        session.pop('current_order_id', None)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Successfully left the order'})
+        
     except Exception as e:
+        db.session.rollback()
         print(f"Error leaving order: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': 'Failed to leave order'
-        }), 500
+        return jsonify({'success': False, 'message': 'Failed to leave order'})
 
 @app.route('/generate_receipt', methods=['GET'])
 @login_required
 def generate_receipt():
     try:
-        # Get the user's active order
-        active_orders = current_user.orders.filter_by(status='active').all()
-        if not active_orders:
+        order_id = session.get('current_order_id')
+        if not order_id:
             return jsonify({
                 'success': False,
-                'message': 'No active order found'
-            }), 404
-            
-        current_order = active_orders[0]
-        
-        # Get all cart items for all users in this order
-        all_cart_items = []
-        total_amount = 0
-        
+                'message': 'No active order'
+            })
+
+        # Get the order and all its items
+        order = Order.query.get(order_id)
+        if not order:
+            return jsonify({
+                'success': False,
+                'message': 'Order not found'
+            })
+
         # Group items by user
-        user_items = {}
-        
-        for user in current_order.users:
-            cart_items = OrderItem.query.filter_by(
-                order_id=current_order.id,
-                user_id=user.id
-            ).all()
-            
-            if cart_items:
-                user_items[user.name] = {
+        user_orders = {}
+        for item in order.items:
+            user_id = item.user_id
+            if user_id not in user_orders:
+                user_orders[user_id] = {
+                    'name': item.user.name,
                     'items': [],
                     'subtotal': 0
                 }
-                
-                for item in cart_items:
-                    menu_item = MenuItem.query.get(item.menu_item_id)
-                    if menu_item:
-                        item_total = menu_item.price * item.quantity
-                        user_items[user.name]['items'].append({
-                            'name': menu_item.name,
-                            'price': menu_item.price,
-                            'quantity': item.quantity,
-                            'total': item_total
-                        })
-                        user_items[user.name]['subtotal'] += item_total
-                        total_amount += item_total
+            
+            item_total = item.quantity * item.menu_item.price
+            user_orders[user_id]['items'].append({
+                'name': item.menu_item.name,
+                'quantity': item.quantity,
+                'price': item.menu_item.price,
+                'total': item_total
+            })
+            user_orders[user_id]['subtotal'] += item_total
 
-        if not user_items:
-            return jsonify({
-                'success': False,
-                'message': 'No items in cart'
-            }), 404
-
-        receipt = {
-            'order_name': current_order.name,
-            'order_pin': current_order.pin,
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'user_orders': user_items,
-            'total_amount': total_amount
-        }
+        # Calculate grand total
+        grand_total = sum(user['subtotal'] for user in user_orders.values())
 
         return jsonify({
             'success': True,
-            'receipt': receipt
+            'order_name': order.name,
+            'order_pin': order.pin,
+            'user_orders': user_orders,
+            'grand_total': grand_total
         })
 
     except Exception as e:
@@ -646,7 +585,69 @@ def generate_receipt():
         return jsonify({
             'success': False,
             'message': 'Failed to generate receipt'
-        }), 500
+        })
+
+@app.route('/update_quantity', methods=['POST'])
+@login_required
+def update_quantity():
+    try:
+        data = request.get_json()
+        item_name = data.get('item_name')
+        quantity = data.get('quantity')
+        
+        if not item_name or not quantity:
+            return jsonify({
+                'success': False,
+                'message': 'Item name and quantity are required'
+            })
+        
+        # Get current order
+        order_id = session.get('current_order_id')
+        if not order_id:
+            return jsonify({
+                'success': False,
+                'message': 'No active order'
+            })
+            
+        # Get menu item
+        menu_item = MenuItem.query.filter_by(name=item_name).first()
+        if not menu_item:
+            return jsonify({
+                'success': False,
+                'message': 'Item not found'
+            })
+        
+        # Update quantity
+        order_item = OrderItem.query.filter_by(
+            order_id=order_id,
+            user_id=current_user.id,
+            menu_item_id=menu_item.id
+        ).first()
+        
+        if order_item:
+            order_item.quantity = quantity
+            db.session.commit()
+            
+            # Get updated cart
+            cart = get_cart()
+            return jsonify({
+                'success': True,
+                'message': 'Quantity updated',
+                'cart_items': cart.json['items']
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Item not found in cart'
+            })
+            
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating quantity: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Failed to update quantity'
+        })
 
 if __name__ == '__main__':
     with app.app_context():
